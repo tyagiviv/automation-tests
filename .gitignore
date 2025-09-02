@@ -9,6 +9,7 @@ build/
 # Playwright test results and reports
 test-results/
 playwright-report/
+reports/
 
 # Logs
 npm-debug.log*
