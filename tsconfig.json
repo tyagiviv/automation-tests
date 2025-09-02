@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "CommonJS",             // important for Node imports
+    "moduleResolution": "Node",
+    "esModuleInterop": true,          // allows import { ... } from './HomePage'
+    "strict": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "outDir": "dist",
+    "rootDir": "./"
+  },
+  "include": ["pages", "tests"]
+}
