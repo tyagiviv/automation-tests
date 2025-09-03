@@ -10,25 +10,19 @@ const PORT = 4000;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const reportsDir = path.join(__dirname, '../reports'); // All timestamped folders like YYYY-MM-DD_HH-mm-ss
-// const archiveDir = path.join(__dirname, '../archive'); // ❌ REMOVED hard dependency (see below) // ==== CHANGED 0309 ====
+const reportsDir = path.join(__dirname, '../reports');
 const indexHtmlPath = path.join(__dirname, 'index.html');
 
 // Serve favicon and other static files
 app.use(express.static(__dirname));
 app.use('/reports', express.static(reportsDir));
 
-// ❌ No longer statically serving /archive from disk; we respond via /api/archive even if folder doesn't exist. // ==== CHANGED 0309 ====
-// app.use('/archive', express.static(archiveDir));
-
 app.get('/', (req, res) => res.sendFile(indexHtmlPath));
 
-// ==================== NEW FUNCTION: countTests ====================
-// Dynamically counts all test statuses (passed, failed, skipped, etc.)
+// ==================== countTests ====================
 function countTests(suite) {
   let stats = {};
 
-  // Count tests in specs
   if (suite.specs) {
     suite.specs.forEach(spec => {
       if (spec.tests) {
@@ -44,7 +38,6 @@ function countTests(suite) {
     });
   }
 
-  // Recursively count child suites
   if (suite.suites) {
     suite.suites.forEach(childSuite => {
       const childStats = countTests(childSuite);
@@ -56,26 +49,21 @@ function countTests(suite) {
 
   return stats;
 }
-// ================================================================
 
-// ======== NEW: normalize folder -> date-only (YYYY-MM-DD) ========
-// Many folders are named "YYYY-MM-DD_HH-mm-ss". We only need the first 10 chars for date filtering.
-// This fixes issues where only the last report showed up.
-function folderDate(folderName) { // ==== NEW 0309 ====
-  // Expect "YYYY-MM-DD" or "YYYY-MM-DD_HH-mm-ss"
-  return folderName.slice(0, 10);
+// ======== Helpers =========
+function folderDate(folderName) {
+  return folderName.slice(0, 10); // YYYY-MM-DD
 }
 
-// ======== NEW: date helpers for inclusive range checks ===========
-function inDateRange(dateStr, start, end) { // all "YYYY-MM-DD" // ==== NEW 0309 ====
+function inDateRange(dateStr, start, end) {
   if (!start || !end) return true;
   return dateStr >= start && dateStr <= end;
 }
 
+// ==================== /api/runs ====================
 app.get('/api/runs', (req, res) => {
   if (!fs.existsSync(reportsDir)) return res.json([]);
 
-  // ==== CHANGED 0309: treat start/end as date-only strings (YYYY-MM-DD) ====
   const startDate = req.query.start || null;
   const endDate = req.query.end || null;
 
@@ -84,12 +72,10 @@ app.get('/api/runs', (req, res) => {
       const fullPath = path.join(reportsDir, f);
       if (!fs.statSync(fullPath).isDirectory()) return false;
       if (!fs.existsSync(path.join(fullPath, 'results.json'))) return false;
-
-      // ✅ Compare by date prefix only (fixes "only last report shows")
       const d = folderDate(f);
       return inDateRange(d, startDate, endDate);
     })
-    .sort((a, b) => b.localeCompare(a)); // latest first
+    .sort((a, b) => b.localeCompare(a));
 
   const runs = folders.map(folder => {
     const jsonPath = path.join(reportsDir, folder, 'results.json');
@@ -97,24 +83,22 @@ app.get('/api/runs', (req, res) => {
     let stats = {};
     try {
       const json = JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
-
       if (json.suites) {
         json.suites.forEach(suite => {
-          const s = countTests(suite); // use recursive function
+          const s = countTests(suite);
           for (const [status, count] of Object.entries(s)) {
             stats[status] = (stats[status] || 0) + count;
           }
         });
       }
-
     } catch (err) {
       console.error(`Failed to parse JSON for ${folder}`, err);
-      return null; // skip folders with invalid JSON
+      return null;
     }
 
     return {
-      timestamp: folder, // keep full folder name for linking and display
-      date: folderDate(folder), // ==== NEW 0309 ====
+      timestamp: folder,
+      date: folderDate(folder),
       htmlReport: `/reports/${folder}/html-report/index.html`,
       stats
     };
@@ -123,9 +107,8 @@ app.get('/api/runs', (req, res) => {
   res.json(runs);
 });
 
-// ==================== /api/archive (virtual archive tree) ========
-// Works even if there is no /archive directory. It groups /reports by YYYY-MM -> [YYYY-MM-DD...]
-app.get('/api/archive', (req, res) => { // ==== CHANGED 0309 ====
+// ==================== /api/archive ====================
+app.get('/api/archive', (req, res) => {
   if (!fs.existsSync(reportsDir)) return res.json({});
 
   const folders = fs.readdirSync(reportsDir)
@@ -134,22 +117,26 @@ app.get('/api/archive', (req, res) => { // ==== CHANGED 0309 ====
       return fs.statSync(fullPath).isDirectory() && fs.existsSync(path.join(fullPath, 'results.json'));
     });
 
-  // Build { 'YYYY-MM': Set{'YYYY-MM-DD', ...}, ... }
+  // Build { year: { month: [days] } }
   const tree = {};
   for (const f of folders) {
-    const date = folderDate(f); // YYYY-MM-DD
+    const date = folderDate(f);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
-    const ym = date.slice(0, 7); // YYYY-MM
-    tree[ym] = tree[ym] || new Set();
-    tree[ym].add(date);
+    const year = date.slice(0, 4);
+    const month = date.slice(5, 7);
+    tree[year] = tree[year] || {};
+    tree[year][month] = tree[year][month] || new Set();
+    tree[year][month].add(date);
   }
 
-  // Convert Sets to sorted arrays
-  const archiveTree = Object.fromEntries(
-    Object.entries(tree).map(([ym, datesSet]) => [ym, Array.from(datesSet).sort().reverse()])
-  );
+  // Convert Sets → sorted arrays
+  for (const y of Object.keys(tree)) {
+    for (const m of Object.keys(tree[y])) {
+      tree[y][m] = Array.from(tree[y][m]).sort().reverse();
+    }
+  }
 
-  res.json(archiveTree);
+  res.json(tree);
 });
 
 app.listen(PORT, () => {
