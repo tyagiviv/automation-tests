@@ -3,7 +3,7 @@ import { test } from '@playwright/test';
 import { HomePage } from '../pages/HomePage';
 import { RegistrationPage } from '../pages/RegistrationPage';
 
-test('user registration → reregistration → logout → login → delete account successfully', async ({ page }) => {
+test('user registration → reregistration → logout → login → delete account successfully → checked password or email incorrect', async ({ page }) => {
   const home = new HomePage(page);
   const registration = new RegistrationPage(page);
 
@@ -47,6 +47,14 @@ test('user registration → reregistration → logout → login → delete accou
   // Delete account
   await registration.deleteAccount();
   await registration.assertAccountDeleted();
+
+   // Go to Signup / login page again
+  await home.goto();
+  await home.openSignupLogin();
+
+    // Login with the same email which does not exists (or deleted)
+  await home.login(registration['signupEmail'], 'Qwerty@123456');
+  await registration.assertEmailOrPasswordIsIncorrect();
 
 
 });

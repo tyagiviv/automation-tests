@@ -136,4 +136,10 @@ export class RegistrationPage extends BasePage {
   async assertEmailAlreadyExists() {
     await expect(this.page.getByText('Email Address already exist!')).toBeVisible();
   }
+
+    // verify email already exists message present: 'Email Address already exist!'
+  async assertEmailOrPasswordIsIncorrect() {
+    await expect(this.page.getByText('Your email or password is incorrect!')).toBeVisible();
+  }
+
 }
