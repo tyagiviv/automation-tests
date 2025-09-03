@@ -6,7 +6,19 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; background: #f4f6f8; }
-    h1 { text-align: center; margin-bottom: 20px; }
+
+    /* Fancy gradient header */
+    h1 { 
+      text-align: center; 
+      margin-bottom: 20px; 
+      background: linear-gradient(135deg, #42a5f5, #7e57c2);
+      color: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      font-size: 2em;
+    }
+
     #runs { display: flex; flex-direction: column; gap: 8px; max-width: 1000px; margin: 0 auto 20px; }
     .run-item { padding: 10px 15px; background: #fff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
       cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: background 0.2s, border 0.2s; }
@@ -19,10 +31,24 @@
     .flaky { background-color: #ff9800; }
     .unknown { background-color: #607d8b; }
     .timedout { background-color: #9c27b0; color: #fff; }
+
+    /* Pagination spacing */
+    #pagination { text-align: center; margin-top: 30px; margin-bottom: 20px; }
+    
+    /* Pagination buttons */
+    #pagination button { margin: 0 3px; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; transition: background 0.2s; }
+    #pagination button:not(:disabled) { background-color: #2196f3; color: white; }
+    #pagination button:not(:disabled):hover { background-color: #64b5f6; } /* lighter blue on hover */
+    #pagination button:disabled { opacity: 0.5; cursor: not-allowed; background-color: #ccc; color: #666; }
+
+    #pageSize { margin-left: 10px; }
+
     #totals { text-align: center; font-weight: bold; font-size: 1.2em; margin-bottom: 10px; }
+
     .charts-container { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; max-width: 1000px; margin: 0 auto 30px; }
     .chart-box { flex: 1; min-width: 400px; max-width: 480px; height: 400px; background: #fff; border-radius: 8px; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; }
     canvas { width: 100%; height: 100%; }
+
     a { margin-left: 10px; display: inline-block; }
     #archivePanel { max-width: 1000px; margin: 0 auto 20px; background: #fff; padding: 12px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.08); display: none; }
     #archivePanel h3 { margin: 0 0 8px; }
@@ -30,10 +56,6 @@
     #archiveList a { margin: 0 8px 4px 0; }
     #archiveList details { margin-left: 10px; }
     #archiveList summary { cursor: pointer; }
-    #pagination { text-align: center; margin-top: 15px; }
-    #pagination button { margin: 0 3px; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; }
-    #pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
-    #pageSize { margin-left: 10px; }
   </style>
 </head>
 <body>
@@ -54,6 +76,7 @@
   </div>
 
   <div id="runs"></div>
+
   <div id="pagination">
     <button id="prevPage">Prev</button>
     <span id="pageInfo"></span>
