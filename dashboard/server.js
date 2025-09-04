@@ -50,6 +50,33 @@ function countTests(suite) {
   return stats;
 }
 
+// ==================== getTotalTime ====================
+function getTotalTime(suite) {
+  let total = 0;
+
+  if (suite.specs) {
+    suite.specs.forEach(spec => {
+      if (spec.tests) {
+        spec.tests.forEach(test => {
+          if (test.results) {
+            test.results.forEach(result => {
+              total += result.duration || 0; // duration in ms
+            });
+          }
+        });
+      }
+    });
+  }
+
+  if (suite.suites) {
+    suite.suites.forEach(childSuite => {
+      total += getTotalTime(childSuite);
+    });
+  }
+
+  return total;
+}
+
 // ======== Helpers =========
 function folderDate(folderName) {
   return folderName.slice(0, 10); // YYYY-MM-DD
@@ -58,6 +85,23 @@ function folderDate(folderName) {
 function inDateRange(dateStr, start, end) {
   if (!start || !end) return true;
   return dateStr >= start && dateStr <= end;
+}
+
+// ====== NEW: format duration nicely ======
+function formatDuration(ms) {
+  let totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  totalSeconds %= 3600;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${seconds}s`;
+  } else if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  } else {
+    return `${seconds}s`;
+  }
 }
 
 // ==================== /api/runs ====================
@@ -81,8 +125,25 @@ app.get('/api/runs', (req, res) => {
     const jsonPath = path.join(reportsDir, folder, 'results.json');
 
     let stats = {};
+    let totalTimeMs = 0;
+
     try {
       const json = JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
+
+      // ====== CHANGED: Use root duration instead of summing individual tests ======
+      if (json.stats && json.stats.duration != null) {
+        totalTimeMs = json.stats.duration; // real elapsed time in ms
+      } else if (json.startTime && json.endTime) {
+        totalTimeMs = new Date(json.endTime) - new Date(json.startTime);
+      } else if (json.suites) {
+        // fallback: sum all test durations (less accurate for parallel runs)
+        json.suites.forEach(suite => {
+          totalTimeMs += getTotalTime(suite);
+        });
+      }
+      // ====== END CHANGED ======
+
+      // Count test stats as before
       if (json.suites) {
         json.suites.forEach(suite => {
           const s = countTests(suite);
@@ -91,6 +152,7 @@ app.get('/api/runs', (req, res) => {
           }
         });
       }
+
     } catch (err) {
       console.error(`Failed to parse JSON for ${folder}`, err);
       return null;
@@ -100,7 +162,9 @@ app.get('/api/runs', (req, res) => {
       timestamp: folder,
       date: folderDate(folder),
       htmlReport: `/reports/${folder}/html-report/index.html`,
-      stats
+      stats,
+      totalTime: formatDuration(totalTimeMs) // convert ms → show hours/minutes/seconds based on the total duration.
+
     };
   }).filter(run => run !== null);
 

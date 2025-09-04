@@ -31,6 +31,10 @@
     .flaky { background-color: #ff9800; }
     .unknown { background-color: #607d8b; }
     .timedout { background-color: #9c27b0; color: #fff; }
+    .time-badge {
+    background-color: #2b9da5; /* or any color you like */
+    color: #fff;
+}
 
     /* Pagination spacing */
     #pagination { text-align: center; margin-top: 30px; margin-bottom: 20px; }
@@ -156,9 +160,17 @@
         const runDiv = document.createElement('div');
         runDiv.className = 'run-item';
         const badges = Object.entries(run.stats)
+
           .map(([status, count]) => `<span class="status-badge ${status}">${status.toUpperCase()}: ${count}</span>`)
           .join(' ');
-        runDiv.innerHTML = `<div><b>${run.timestamp}</b> ${badges}</div><a href="${run.htmlReport}" target="_blank">View HTML Report</a>`;
+        // runDiv.innerHTML = `<div><b>${run.timestamp}</b> ${badges}</div><a href="${run.htmlReport}" target="_blank">View HTML Report</a>`;
+        // const timeBadge = `<span class="status-badge unknown">Time: ${run.totalTime || 'N/A'}</span>`;
+        const timeBadge = `<span class="status-badge time-badge">Time: ${run.totalTime || 'N/A'}</span>`;
+
+
+        runDiv.innerHTML = `<div><b>${run.timestamp}</b> ${badges} ${timeBadge}</div>
+                    <a href="${run.htmlReport}" target="_blank">View HTML Report</a>`;
+
         runDiv.addEventListener('click', () => {
           document.querySelectorAll('.run-item').forEach(el => el.classList.remove('selected'));
           runDiv.classList.add('selected');
@@ -375,7 +387,7 @@
     // ===== Custom Range Handler =====
     function applyCustomRange() {
       const start = document.getElementById('startDate').value;
-      const end = document.getElementById('endDate').value;
+      const end = document.getElementById('endDate').value; 
       if (start && end) {
         loadRuns({ start, end });
       }
