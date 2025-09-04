@@ -1,4 +1,4 @@
-import { Page } from '@playwright/test';
+import { Page, Dialog } from '@playwright/test';
 
 export class BasePage {
   readonly page: Page;
@@ -29,5 +29,21 @@ export class BasePage {
       }
     }
   }
-
+  // ✅ Generic alert/dialog handler
+  async handleDialog(action: 'accept' | 'dismiss' = 'accept', message?: string) {
+    this.page.once('dialog', async (dialog: Dialog) => {
+      if (message) {
+        // optional: verify alert text
+        if (dialog.message() !== message) {
+          console.warn(`Unexpected dialog message: ${dialog.message()}`);
+        }
+      }
+      if (action === 'accept') {
+        await dialog.accept();
+      } else {
+        await dialog.dismiss();
+      }
+    });
+  }
 }
+

@@ -22,8 +22,8 @@ export default defineConfig({
   use: {
     headless: true,
     viewport: { width: 1280, height: 720 },
-    screenshot: 'on',
-    video: 'on',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
     trace: 'on-first-retry',
     actionTimeout: 60000,
     baseURL: 'https://www.automationexercise.com',
