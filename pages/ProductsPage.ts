@@ -4,12 +4,16 @@ import { BasePage } from './BasePage';
 export class ProductsPage extends BasePage {
   readonly productsLink: Locator;
   readonly productList: Locator;
+  readonly searchField: Locator;
+  readonly searchButton: Locator;
 
   constructor(page: Page) {
     super(page);
 
     this.productsLink = page.getByRole('link', { name: 'Products' });
     this.productList = page.locator('.product-image-wrapper'); // adjust selector to match your product items
+    this.searchField = page.locator('#search_product');
+    this.searchButton = page.locator('#submit_search');
   }
 
   async gotoProducts() {
@@ -79,6 +83,20 @@ export class ProductsPage extends BasePage {
     }
   }
 
-  
+  async searchProduct(productName: string) {
+    await this.searchField.fill(productName);
+    await this.searchButton.click();
+  }
+
+  async verifySearchResultsVisible() {
+    await expect(this.page.locator('h2.title.text-center', { hasText: 'Searched Products' })).toBeVisible();
+    await expect(this.productList.first()).toBeVisible();
+    const count = await this.productList.count();
+    expect(count).toBeGreaterThan(0);
+  }
+
+  async getAllProductNames(): Promise<string[]> {
+    return await this.page.locator('.productinfo p').allInnerTexts();
+  }
 
 }

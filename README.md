@@ -118,7 +118,10 @@ git add .
 git commit -m "add comment"
 git push -u origin main
 
-to run on environment level:
+# to run on environment level:
 npx playwright test --project=prod
 npx playwright test --project=dev
 npx playwright test --project=staging
+
+# To run specific test on debug and headed view with enviornment defined...
+npx playwright test tests/product/7_productSearch.spec.ts --project=prod --headed --debug

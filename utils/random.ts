@@ -18,3 +18,11 @@ export function getRandomSubject(): string {
 export function getRandomMessage(): string {
   return `This is a test message: ${getRandomString(20)}`;
 }
+
+export function getRandomItems<T>(items: T[], count: number): T[] {
+  if (items.length === 0) throw new Error('❌ No items available to pick');
+
+  return [...items]
+    .sort(() => 0.5 - Math.random()) // shuffle
+    .slice(0, Math.min(count, items.length));
+}
