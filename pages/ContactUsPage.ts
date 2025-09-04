@@ -1,5 +1,6 @@
 import { Locator, expect, Page } from '@playwright/test';
 import { BasePage } from './BasePage';
+import { TIMEOUT } from 'dns';
 
 export class ContactUsPage extends BasePage {
   readonly contactUsLink: Locator;
@@ -47,6 +48,7 @@ export class ContactUsPage extends BasePage {
     }
 
     await this.handleDialog('accept');    // ✅ from BasePage
+    await expect(this.submitButton).toBeEnabled({ timeout: 5000 });
     await this.submitButton.click();
   }
 
