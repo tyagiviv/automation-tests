@@ -1,5 +1,5 @@
 import { test } from '@playwright/test';
-import { ProductsPage } from '../pages/ProductsPage';
+import { ProductsPage } from '@pages/ProductsPage';
 
 test.describe('Products Page', () => {
   test('6.1 User can view first product details successfully', async ({ page }) => {

@@ -1,6 +1,6 @@
 import { test } from '@playwright/test';
-import { ContactUsPage } from '../pages/ContactUsPage';
-import { getRandomEmail, getRandomMessage, getRandomSubject, getRandomString } from '../utils/random';
+import { ContactUsPage } from '@pages/ContactUsPage';
+import { getRandomEmail, getRandomMessage, getRandomSubject, getRandomString } from '@utils/random';
 
 
 test.describe('Contact Us Page', () => {

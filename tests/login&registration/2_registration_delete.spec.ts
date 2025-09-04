@@ -1,6 +1,6 @@
 import { test } from '@playwright/test';
-import { HomePage } from '../pages/HomePage';
-import { RegistrationPage } from '../pages/RegistrationPage';
+import { HomePage } from '@pages/HomePage';
+import { RegistrationPage } from '@pages/RegistrationPage';
 import { faker } from '@faker-js/faker';
 
 test('user register and deleted successfully', async ({ page }) => {
