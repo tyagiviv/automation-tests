@@ -112,3 +112,13 @@ rm -rf node_modules/.cache
 rm -rf playwright-report
 rm -rf tests/.tsbuildinfo
   
+
+# git commands
+git add .
+git commit -m "add comment"
+git push -u origin main
+
+to run on environment level:
+npx playwright test --project=prod
+npx playwright test --project=dev
+npx playwright test --project=staging

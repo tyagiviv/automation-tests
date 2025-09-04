@@ -43,7 +43,7 @@ export class ContactUsPage extends BasePage {
     await this.messageTextarea.fill(message);
 
     if (filePath) {
-      await this.uploadFileInput.setInputFiles(filePath);
+      await this.uploadFileInput.setInputFiles(filePath); 
     }
 
     await this.handleDialog('accept');    // ✅ from BasePage
@@ -51,7 +51,9 @@ export class ContactUsPage extends BasePage {
   }
 
   async verifySuccessMessage() {
-    await expect(this.successMessage).toBeVisible();
+    // await expect(this.successMessage).toBeVisible();
+    await this.successMessage.waitFor({ state: 'visible', timeout: 10000 });
+
     await expect(this.successMessage).toHaveText(
       'Success! Your details have been submitted successfully.'
     );
