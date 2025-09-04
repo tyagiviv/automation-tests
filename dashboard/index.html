@@ -7,7 +7,6 @@
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; background: #f4f6f8; }
 
-    /* Fancy gradient header */
     h1 { 
       text-align: center; 
       margin-bottom: 20px; 
@@ -24,6 +23,7 @@
       cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: background 0.2s, border 0.2s; }
     .run-item:hover { background: #e1f5fe; }
     .run-item.selected { border: 2px solid #2196f3; background: #e3f2fd; }
+
     .status-badge { padding: 3px 8px; border-radius: 12px; color: #fff; font-weight: bold; margin-left: 5px; font-size: 0.85em; min-width: 50px; text-align: center; background-color: #607d8b; }
     .passed { background-color: #4caf50; }
     .failed { background-color: #f44336; }
@@ -31,20 +31,13 @@
     .flaky { background-color: #ff9800; }
     .unknown { background-color: #607d8b; }
     .timedout { background-color: #9c27b0; color: #fff; }
-    .time-badge {
-    background-color: #2b9da5; /* or any color you like */
-    color: #fff;
-}
+    .time-badge { background-color: #2b9da5; color: #fff; }
 
-    /* Pagination spacing */
     #pagination { text-align: center; margin-top: 30px; margin-bottom: 20px; }
-    
-    /* Pagination buttons */
     #pagination button { margin: 0 3px; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; transition: background 0.2s; }
     #pagination button:not(:disabled) { background-color: #2196f3; color: white; }
-    #pagination button:not(:disabled):hover { background-color: #64b5f6; } /* lighter blue on hover */
+    #pagination button:not(:disabled):hover { background-color: #64b5f6; }
     #pagination button:disabled { opacity: 0.5; cursor: not-allowed; background-color: #ccc; color: #666; }
-
     #pageSize { margin-left: 10px; }
 
     #totals { text-align: center; font-weight: bold; font-size: 1.2em; margin-bottom: 10px; }
@@ -60,6 +53,21 @@
     #archiveList a { margin: 0 8px 4px 0; }
     #archiveList details { margin-left: 10px; }
     #archiveList summary { cursor: pointer; }
+
+    #testPopup {
+      position: absolute;
+      background: #fff;
+      border: 1px solid #ccc;
+      padding: 10px;
+      border-radius: 6px;
+      max-width: 300px;
+      max-height: 400px;
+      overflow-y: auto;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      display: none;
+      z-index: 999;
+      font-size: 0.85em;
+    }
   </style>
 </head>
 <body>
@@ -99,6 +107,8 @@
     <div class="chart-box"><canvas id="barChart"></canvas></div>
     <div class="chart-box"><canvas id="pieChart"></canvas></div>
   </div>
+
+  <div id="testPopup"></div>
 
   <script>
     let barChart = null;
@@ -161,32 +171,46 @@
         runDiv.className = 'run-item';
 
         const badgeOrder = ['passed', 'failed', 'skipped', 'flaky', 'timedout', 'unknown'];
-        const badges = badgeOrder
+        const badgesHtml = badgeOrder
           .map(status => {
             const key = Object.keys(run.stats).find(k => k.toLowerCase() === status);
             if (!key) return null;
-            return `<span class="status-badge ${status}">${status.toUpperCase()}: ${run.stats[key]}</span>`;
+            return `<span class="status-badge ${status}" data-status="${status}">${status.toUpperCase()}: ${run.stats[key]}</span>`;
           })
           .filter(Boolean)
           .join(' ');
 
-     
-        
-        
-          // runDiv.innerHTML = `<div><b>${run.timestamp}</b> ${badges}</div><a href="${run.htmlReport}" target="_blank">View HTML Report</a>`;
-        // const timeBadge = `<span class="status-badge unknown">Time: ${run.totalTime || 'N/A'}</span>`;
         const timeBadge = `<span class="status-badge time-badge">Time: ${run.totalTime || 'N/A'}</span>`;
 
-
-        runDiv.innerHTML = `<div><b>${run.timestamp}</b> ${badges} ${timeBadge}</div>
+        runDiv.innerHTML = `<div><b>${run.timestamp}</b> ${badgesHtml} ${timeBadge}</div>
                     <a href="${run.htmlReport}" target="_blank">View HTML Report</a>`;
+
+        // Add hover popup for badges
+        const popup = document.getElementById('testPopup');
+        runDiv.querySelectorAll('.status-badge').forEach(badgeEl => {
+          const status = badgeEl.dataset.status;
+          if(!status || !run.testsByStatus) return;
+          badgeEl.addEventListener('mouseenter', e => {
+            const statusLower = status.toLowerCase();
+            const testNames = run.testsByStatus[statusLower] || [];
+            popup.innerHTML = testNames.length
+              ? `<b>${status.toUpperCase()} Tests:</b><ul>${testNames.map(t => `<li>${t}</li>`).join('')}</ul>`
+              : `<b>No tests for ${status.toUpperCase()}</b>`;
+            popup.style.display = 'block';
+            popup.style.left = e.pageX + 10 + 'px';
+            popup.style.top = e.pageY + 10 + 'px';
+          });
+          badgeEl.addEventListener('mouseleave', () => popup.style.display = 'none');
+        });
 
         runDiv.addEventListener('click', () => {
           document.querySelectorAll('.run-item').forEach(el => el.classList.remove('selected'));
           runDiv.classList.add('selected');
           updateCharts(run);
         });
+
         runsDiv.appendChild(runDiv);
+
         if (index === 0) {
           runDiv.classList.add('selected');
           updateCharts(run);
@@ -203,7 +227,7 @@
       const labels = Object.keys(run.stats);
       const data = Object.values(run.stats);
       const colors = labels.map(status => {
-        switch(status) {
+        switch(status.toLowerCase()) {
           case 'passed': return '#4caf50';
           case 'failed': return '#f44336';
           case 'skipped': return '#9e9e9e';
@@ -217,6 +241,8 @@
       const failed = run.stats.failed||0;
       document.getElementById('totals').textContent = `Total: ${total} | Passed: ${passed} | Failed: ${failed}`;
 
+      const popup = document.getElementById('testPopup');
+
       const barCtx = document.getElementById('barChart').getContext('2d');
       if(barChart) barChart.destroy();
       barChart = new Chart(barCtx, {
@@ -224,7 +250,28 @@
         data:{labels,datasets:[{label:`Test Status - ${run.timestamp}`,data,backgroundColor:colors}]},
         options:{
           responsive:true,
-          plugins:{legend:{display:false},title:{display:true,text:`Total Tests: ${total}`}},
+          plugins:{
+            legend:{display:false},
+            title:{display:true,text:`Total Tests: ${total}`},
+            tooltip:{
+              enabled: false,
+              external: (ctx) => {
+                const el = ctx.tooltip;
+                if(!el.opacity) { popup.style.display = 'none'; return; }
+                const idx = el.dataPoints[0].dataIndex;
+                const status = labels[idx];
+                const statusLower = status.toLowerCase();
+                const testNames = run.testsByStatus[statusLower] || [];
+                popup.innerHTML = testNames.length
+                  ? `<b>${status.toUpperCase()} Tests:</b><ul>${testNames.map(t => `<li>${t}</li>`).join('')}</ul>`
+                  : `<b>No tests for ${status.toUpperCase()}</b>`;
+                const canvasRect = ctx.chart.canvas.getBoundingClientRect();
+                popup.style.display = 'block';
+                popup.style.left = canvasRect.left + el.caretX + 10 + 'px';
+                popup.style.top = canvasRect.top + el.caretY + 10 + 'px';
+              }
+            }
+          },
           scales:{y:{beginAtZero:true,title:{display:true,text:'Test Count'}}, x:{title:{display:true,text:'Status'}}}
         }
       });
@@ -234,7 +281,31 @@
       pieChart = new Chart(pieCtx, {
         type:'pie',
         data:{labels,datasets:[{label:`Test Status - ${run.timestamp}`,data,backgroundColor:colors}]},
-        options:{responsive:true, plugins:{legend:{position:'right'},title:{display:true,text:`Total Tests: ${total}`}}}
+        options:{
+          responsive:true,
+          plugins:{
+            legend:{position:'right'},
+            title:{display:true,text:`Total Tests: ${total}`},
+            tooltip:{
+              enabled:false,
+              external:(ctx)=>{
+                const el = ctx.tooltip;
+                if(!el.opacity) { popup.style.display = 'none'; return; }
+                const idx = el.dataPoints[0].dataIndex;
+                const status = labels[idx];
+                const statusLower = status.toLowerCase();
+                const testNames = run.testsByStatus[statusLower] || [];
+                popup.innerHTML = testNames.length
+                  ? `<b>${status.toUpperCase()} Tests:</b><ul>${testNames.map(t => `<li>${t}</li>`).join('')}</ul>`
+                  : `<b>No tests for ${status.toUpperCase()}</b>`;
+                const canvasRect = ctx.chart.canvas.getBoundingClientRect();
+                popup.style.display = 'block';
+                popup.style.left = canvasRect.left + el.caretX + 10 + 'px';
+                popup.style.top = canvasRect.top + el.caretY + 10 + 'px';
+              }
+            }
+          }
+        }
       });
     }
 
@@ -302,19 +373,12 @@
       filterQuick('today');
     })();
 
-    // ===== Pagination events =====
     document.getElementById('prevPage').addEventListener('click', () => {
-      if (currentPage > 1) {
-        currentPage--;
-        displayRuns();
-      }
+      if (currentPage > 1) { currentPage--; displayRuns(); }
     });
     document.getElementById('nextPage').addEventListener('click', () => {
       const totalPages = Math.ceil(allRuns.length / pageSize);
-      if (currentPage < totalPages) {
-        currentPage++;
-        displayRuns();
-      }
+      if (currentPage < totalPages) { currentPage++; displayRuns(); }
     });
     document.getElementById('pageSize').addEventListener('change', (e) => {
       pageSize = parseInt(e.target.value, 10);
@@ -322,19 +386,16 @@
       displayRuns();
     });
 
-    // ===== Archive link click =====
     document.getElementById('archiveLink').addEventListener('click', async (e) => {
       e.preventDefault();
       const panel = document.getElementById('archivePanel');
       const list = document.getElementById('archiveList');
-
       if (panel.style.display === 'none' || panel.style.display === '') {
         panel.style.display = 'block';
         list.textContent = 'Loading…';
         try {
           const res = await fetch('/api/archive');
           const archiveTree = await res.json();
-
           if (!archiveTree || Object.keys(archiveTree).length === 0) {
             list.innerHTML = '<div style="opacity:0.7;">No archive found yet.</div>';
             return;
@@ -350,22 +411,19 @@
                 .forEach(([month, days]) => {
                   const visibleDays = days.slice(0, 10);
                   const hiddenDays = days.slice(10);
-
                   const dayLinks = visibleDays.map(day =>
                     `<a href="#" onclick="loadRuns({start:'${day}', end:'${day}'}); return false;">${day.slice(8)}</a>`
                   ).join(' ');
 
                   let monthHtml = `<details><summary>${year}-${month}</summary><div style="margin-left:15px;">${dayLinks}`;
-
                   if (hiddenDays.length > 0) {
                     const moreId = `${year}-${month}-more`;
-                    monthHtml += `<span id="${moreId}" style="display:none;"> ` +
+                    monthHtml += `<span id="${moreId}" style="display:none;">` +
                       hiddenDays.map(day =>
                         `<a href="#" onclick="loadRuns({start:'${day}', end:'${day}'}); return false;">${day.slice(8)}</a>`
-                      ).join(' ') + `</span>`;
+                      ).join('') + `</span>`;
                     monthHtml += `<br><a href="#" onclick="document.getElementById('${moreId}').style.display='inline'; this.style.display='none'; return false;">Load more…</a>`;
                   }
-
                   monthHtml += "</div></details>";
                   html += monthHtml;
                 });
@@ -373,7 +431,6 @@
             });
           list.innerHTML = html;
 
-          // Date Picker for custom ranges
           const pickerHtml = `
             <div style="margin-top:10px;">
               <label>Custom Range: 
@@ -389,18 +446,13 @@
           list.innerHTML = '<div style="color:#f44336;">Failed to load archive.</div>';
           console.error('Archive load error:', err);
         }
-      } else {
-        panel.style.display = 'none';
-      }
+      } else { panel.style.display = 'none'; }
     });
 
-    // ===== Custom Range Handler =====
     function applyCustomRange() {
       const start = document.getElementById('startDate').value;
       const end = document.getElementById('endDate').value; 
-      if (start && end) {
-        loadRuns({ start, end });
-      }
+      if (start && end) loadRuns({ start, end });
     }
   </script>
 </body>

@@ -3,7 +3,7 @@ import { test } from '@playwright/test';
 import { HomePage } from '@pages/HomePage';
 import { RegistrationPage } from '@pages/RegistrationPage';
 
-test('user registration → reregistration → logout → login → delete account successfully → checked password or email incorrect', async ({ page }) => {
+test('4 user registration → reregistration → logout → login → delete account successfully → checked password or email incorrect', async ({ page }) => {
   const home = new HomePage(page);
   const registration = new RegistrationPage(page);
 

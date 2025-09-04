@@ -4,7 +4,7 @@ import { getRandomEmail, getRandomMessage, getRandomSubject, getRandomString } f
 
 
 test.describe('Contact Us Page', () => {
-  test('should submit contact form successfully', async ({ page }) => {
+  test('5 should submit contact form successfully', async ({ page }) => {
     const contactUsPage = new ContactUsPage(page);
 
     // Step 1: Navigate to Contact Us page

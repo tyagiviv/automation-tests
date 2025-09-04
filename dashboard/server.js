@@ -28,11 +28,10 @@ function countTests(suite) {
       if (spec.tests) {
         spec.tests.forEach(test => {
           if (test.results) {
-            let firstFailed = false; // ✅ NEW: track if test failed first attempt
+            let firstFailed = false; 
             test.results.forEach((result, index) => {
               let status = result.status || 'unknown';
 
-              // ✅ NEW: mark flaky if first attempt failed but later passed
               if (index === 0 && status === 'failed') firstFailed = true;
               if (firstFailed && status === 'passed') status = 'flaky';
 
@@ -56,6 +55,37 @@ function countTests(suite) {
   return stats;
 }
 
+// ==================== getTestsByStatus ====================
+function getTestsByStatus(suite, map = {}) {
+  const allStatuses = ['passed','failed','skipped','flaky','timedout','unknown'];
+  allStatuses.forEach(s => map[s] = map[s] || []);
+
+  if (suite.specs) {
+    suite.specs.forEach(spec => {
+      if (spec.tests) {
+        spec.tests.forEach(test => {
+          if (test.results) {
+            let firstFailed = false;
+            test.results.forEach((result, idx) => {
+              let status = (result.status || 'unknown').toLowerCase();
+
+              if (idx === 0 && status === 'failed') firstFailed = true;
+              if (firstFailed && status === 'passed') status = 'flaky';
+
+              const testTitle = spec.title || 'Unnamed Test';
+              if (!map[status].includes(testTitle)) map[status].push(testTitle);
+            });
+          }
+        });
+      }
+    });
+  }
+
+  if (suite.suites) suite.suites.forEach(child => getTestsByStatus(child, map));
+
+  return map;
+}
+
 // ==================== getTotalTime ====================
 function getTotalTime(suite) {
   let total = 0;
@@ -66,7 +96,7 @@ function getTotalTime(suite) {
         spec.tests.forEach(test => {
           if (test.results) {
             test.results.forEach(result => {
-              total += result.duration || 0; // duration in ms
+              total += result.duration || 0;
             });
           }
         });
@@ -85,7 +115,7 @@ function getTotalTime(suite) {
 
 // ======== Helpers =========
 function folderDate(folderName) {
-  return folderName.slice(0, 10); // YYYY-MM-DD
+  return folderName.slice(0, 10); 
 }
 
 function inDateRange(dateStr, start, end) {
@@ -93,7 +123,6 @@ function inDateRange(dateStr, start, end) {
   return dateStr >= start && dateStr <= end;
 }
 
-// ====== NEW: format duration nicely ======
 function formatDuration(ms) {
   let totalSeconds = Math.floor(ms / 1000);
   const hours = Math.floor(totalSeconds / 3600);
@@ -101,13 +130,9 @@ function formatDuration(ms) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
 
-  if (hours > 0) {
-    return `${hours}h ${minutes}m ${seconds}s`;
-  } else if (minutes > 0) {
-    return `${minutes}m ${seconds}s`;
-  } else {
-    return `${seconds}s`;
-  }
+  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
 }
 
 // ==================== /api/runs ====================
@@ -131,31 +156,30 @@ app.get('/api/runs', (req, res) => {
     const jsonPath = path.join(reportsDir, folder, 'results.json');
 
     let stats = {};
+    let testsByStatus = {};
     let totalTimeMs = 0;
 
     try {
       const json = JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
 
-      // ====== CHANGED: Use root duration instead of summing individual tests ======
       if (json.stats && json.stats.duration != null) {
-        totalTimeMs = json.stats.duration; // real elapsed time in ms
+        totalTimeMs = json.stats.duration;
       } else if (json.startTime && json.endTime) {
         totalTimeMs = new Date(json.endTime) - new Date(json.startTime);
       } else if (json.suites) {
-        // fallback: sum all test durations (less accurate for parallel runs)
         json.suites.forEach(suite => {
           totalTimeMs += getTotalTime(suite);
         });
       }
-      // ====== END CHANGED ======
 
-      // Count test stats as before, but now flaky too ✅
       if (json.suites) {
         json.suites.forEach(suite => {
-          const s = countTests(suite); // countTests now handles flaky
+          const s = countTests(suite);
           for (const [status, count] of Object.entries(s)) {
             stats[status] = (stats[status] || 0) + count;
           }
+
+          testsByStatus = getTestsByStatus(suite, testsByStatus);
         });
       }
 
@@ -169,7 +193,8 @@ app.get('/api/runs', (req, res) => {
       date: folderDate(folder),
       htmlReport: `/reports/${folder}/html-report/index.html`,
       stats,
-      totalTime: formatDuration(totalTimeMs) // convert ms → show hours/minutes/seconds based on the total duration.
+      testsByStatus,
+      totalTime: formatDuration(totalTimeMs)
     };
   }).filter(run => run !== null);
 
@@ -186,7 +211,6 @@ app.get('/api/archive', (req, res) => {
       return fs.statSync(fullPath).isDirectory() && fs.existsSync(path.join(fullPath, 'results.json'));
     });
 
-  // Build { year: { month: [days] } }
   const tree = {};
   for (const f of folders) {
     const date = folderDate(f);
@@ -198,7 +222,6 @@ app.get('/api/archive', (req, res) => {
     tree[year][month].add(date);
   }
 
-  // Convert Sets → sorted arrays
   for (const y of Object.keys(tree)) {
     for (const m of Object.keys(tree[y])) {
       tree[y][m] = Array.from(tree[y][m]).sort().reverse();

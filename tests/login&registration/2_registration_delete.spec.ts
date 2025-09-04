@@ -3,7 +3,7 @@ import { HomePage } from '@pages/HomePage';
 import { RegistrationPage } from '@pages/RegistrationPage';
 import { faker } from '@faker-js/faker';
 
-test('user register and deleted successfully', async ({ page }) => {
+test('2 user register and deleted successfully', async ({ page }) => {
   const home = new HomePage(page);
   const registration = new RegistrationPage(page);
 
