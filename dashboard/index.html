@@ -159,11 +159,21 @@
       pageRuns.forEach((run, index) => {
         const runDiv = document.createElement('div');
         runDiv.className = 'run-item';
-        const badges = Object.entries(run.stats)
 
-          .map(([status, count]) => `<span class="status-badge ${status}">${status.toUpperCase()}: ${count}</span>`)
+        const badgeOrder = ['passed', 'failed', 'skipped', 'flaky', 'timedout', 'unknown'];
+        const badges = badgeOrder
+          .map(status => {
+            const key = Object.keys(run.stats).find(k => k.toLowerCase() === status);
+            if (!key) return null;
+            return `<span class="status-badge ${status}">${status.toUpperCase()}: ${run.stats[key]}</span>`;
+          })
+          .filter(Boolean)
           .join(' ');
-        // runDiv.innerHTML = `<div><b>${run.timestamp}</b> ${badges}</div><a href="${run.htmlReport}" target="_blank">View HTML Report</a>`;
+
+     
+        
+        
+          // runDiv.innerHTML = `<div><b>${run.timestamp}</b> ${badges}</div><a href="${run.htmlReport}" target="_blank">View HTML Report</a>`;
         // const timeBadge = `<span class="status-badge unknown">Time: ${run.totalTime || 'N/A'}</span>`;
         const timeBadge = `<span class="status-badge time-badge">Time: ${run.totalTime || 'N/A'}</span>`;
 
