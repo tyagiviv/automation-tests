@@ -2,7 +2,7 @@ import { test } from '@playwright/test';
 import { ProductsPage } from '../pages/ProductsPage';
 
 test.describe('Products Page', () => {
-  test('User can view first product details successfully', async ({ page }) => {
+  test('6.1 User can view first product details successfully', async ({ page }) => {
     const productsPage = new ProductsPage(page);
 
     // Step 1-5: Navigate to Products page
@@ -18,7 +18,7 @@ test.describe('Products Page', () => {
     await productsPage.verifyProductDetailsVisible();
   });
 
-  test('User can view 10 random product details (extended regression)', async ({ page }) => {
+  test('6.2 User can view 10 random product details (extended regression)', async ({ page }) => {
     const productsPage = new ProductsPage(page);
 
     await productsPage.gotoProducts();

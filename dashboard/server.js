@@ -28,8 +28,14 @@ function countTests(suite) {
       if (spec.tests) {
         spec.tests.forEach(test => {
           if (test.results) {
-            test.results.forEach(result => {
-              const status = result.status || 'unknown';
+            let firstFailed = false; // ✅ NEW: track if test failed first attempt
+            test.results.forEach((result, index) => {
+              let status = result.status || 'unknown';
+
+              // ✅ NEW: mark flaky if first attempt failed but later passed
+              if (index === 0 && status === 'failed') firstFailed = true;
+              if (firstFailed && status === 'passed') status = 'flaky';
+
               stats[status] = (stats[status] || 0) + 1;
             });
           }
@@ -143,10 +149,10 @@ app.get('/api/runs', (req, res) => {
       }
       // ====== END CHANGED ======
 
-      // Count test stats as before
+      // Count test stats as before, but now flaky too ✅
       if (json.suites) {
         json.suites.forEach(suite => {
-          const s = countTests(suite);
+          const s = countTests(suite); // countTests now handles flaky
           for (const [status, count] of Object.entries(s)) {
             stats[status] = (stats[status] || 0) + count;
           }
@@ -164,7 +170,6 @@ app.get('/api/runs', (req, res) => {
       htmlReport: `/reports/${folder}/html-report/index.html`,
       stats,
       totalTime: formatDuration(totalTimeMs) // convert ms → show hours/minutes/seconds based on the total duration.
-
     };
   }).filter(run => run !== null);
 
