@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Automation Dashboard</title>
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f4f6f8; }
+
+    h1 { 
+      text-align: center; 
+      margin-bottom: 20px; 
+      background: linear-gradient(135deg, #42a5f5, #7e57c2);
+      color: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      font-size: 2em;
+    }
+
+    #runs { display: flex; flex-direction: column; gap: 8px; max-width: 1000px; margin: 0 auto 20px; }
+    .run-item { padding: 10px 15px; background: #fff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: background 0.2s, border 0.2s; }
+    .run-item:hover { background: #e1f5fe; }
+    .run-item.selected { border: 2px solid #2196f3; background: #e3f2fd; }
+
+    .status-badge { padding: 3px 8px; border-radius: 12px; color: #fff; font-weight: bold; margin-left: 5px; font-size: 0.85em; min-width: 50px; text-align: center; background-color: #607d8b; }
+    .passed { background-color: #4caf50; }
+    .failed { background-color: #f44336; }
+    .skipped { background-color: #9e9e9e; }
+    .flaky { background-color: #ff9800; }
+    .unknown { background-color: #607d8b; }
+    .timedout { background-color: #9c27b0; color: #fff; }
+    .time-badge { background-color: #2b9da5; color: #fff; }
+
+    #pagination { text-align: center; margin-top: 30px; margin-bottom: 20px; }
+    #pagination button { margin: 0 3px; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; transition: background 0.2s; }
+    #pagination button:not(:disabled) { background-color: #2196f3; color: white; }
+    #pagination button:not(:disabled):hover { background-color: #64b5f6; }
+    #pagination button:disabled { opacity: 0.5; cursor: not-allowed; background-color: #ccc; color: #666; }
+    #pageSize { margin-left: 10px; }
+
+    #totals { text-align: center; font-weight: bold; font-size: 1.2em; margin-bottom: 10px; }
+
+    .charts-container { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; max-width: 1000px; margin: 0 auto 30px; }
+    .chart-box { flex: 1; min-width: 400px; max-width: 480px; height: 400px; background: #fff; border-radius: 8px; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; }
+    canvas { width: 100%; height: 100%; }
+
+    a { margin-left: 10px; display: inline-block; }
+    #archivePanel { max-width: 1000px; margin: 0 auto 20px; background: #fff; padding: 12px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.08); display: none; }
+    #archivePanel h3 { margin: 0 0 8px; }
+    #archiveList { font-size: 0.95em; line-height: 1.6; }
+    #archiveList a { margin: 0 8px 4px 0; }
+    #archiveList details { margin-left: 10px; }
+    #archiveList summary { cursor: pointer; }
+
+    #testPopup {
+      position: absolute;
+      background: #fff;
+      border: 1px solid #ccc;
+      padding: 10px;
+      border-radius: 6px;
+      max-width: 300px;
+      max-height: 400px;
+      overflow-y: auto;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      display: none;
+      z-index: 999;
+      font-size: 0.85em;
+    }
+  </style>
+</head>
+<body>
+  <h1>Automation Test Analytics Dashboard</h1>
+
+  <div style="text-align:center; margin-bottom:15px;">
+    <a href="#" id="archiveLink">📁 Archive</a> |
+    <select id="dateSelect"></select> |
+    <a href="#" onclick="filterQuick('today')">Today</a> |
+    <a href="#" onclick="filterQuick('yesterday')">Yesterday</a> |
+    <a href="#" onclick="filterQuick('thisWeek')">This Week</a> |
+    <a href="#" onclick="filterQuick('lastWeek')">Last Week</a>
+  </div>
+
+  <div id="archivePanel">
+    <h3>Archive</h3>
+    <div id="archiveList">Loading…</div>
+  </div>
+
+  <div id="runs"></div>
+
+  <div id="pagination">
+    <button id="prevPage">Prev</button>
+    <span id="pageInfo"></span>
+    <button id="nextPage">Next</button>
+    <label for="pageSize">Page size:</label>
+    <select id="pageSize">
+      <option value="10" selected>10</option>
+      <option value="20">20</option>
+      <option value="50">50</option>
+    </select>
+  </div>
+
+  <div id="totals">Total: 0 | Passed: 0 | Failed: 0</div>
+
+  <div class="charts-container">
+    <div class="chart-box"><canvas id="barChart"></canvas></div>
+    <div class="chart-box"><canvas id="pieChart"></canvas></div>
+  </div>
+
+  <div id="testPopup"></div>
+
+  <script>
+    let barChart = null;
+    let pieChart = null;
+    let allRuns = [];
+    let currentPage = 1;
+    let pageSize = 10;
+
+    function toYMD(d) {
+      const yy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${yy}-${mm}-${dd}`;
+    }
+
+    function startOfThisWeek(date) {
+      const d = new Date(date);
+      const day = d.getDay();
+      const diff = (day === 0 ? -6 : 1 - day);
+      d.setDate(d.getDate() + diff);
+      d.setHours(0,0,0,0);
+      return d;
+    }
+
+    function lastWeekRange(date) {
+      const thisMon = startOfThisWeek(date);
+      const lastMon = new Date(thisMon);
+      lastMon.setDate(thisMon.getDate() - 7);
+      const lastSun = new Date(thisMon);
+      lastSun.setDate(thisMon.getDate() - 1);
+      return [lastMon, lastSun];
+    }
+
+    async function loadRuns(params = {}) {
+      const qs = new URLSearchParams(params).toString();
+      const url = qs ? `/api/runs?${qs}` : '/api/runs';
+      const res = await fetch(url);
+      allRuns = await res.json();
+      currentPage = 1;
+      displayRuns();
+    }
+
+    function displayRuns() {
+      const runsDiv = document.getElementById('runs');
+      runsDiv.innerHTML = '';
+      if (!allRuns.length) {
+        runsDiv.innerHTML = '<div style="text-align:center;opacity:0.7;">No runs in this range.</div>';
+        document.getElementById('totals').textContent = 'Total: 0 | Passed: 0 | Failed: 0';
+        if (barChart) { barChart.destroy(); barChart = null; }
+        if (pieChart) { pieChart.destroy(); pieChart = null; }
+        document.getElementById('pageInfo').textContent = '';
+        return;
+      }
+
+      const startIdx = (currentPage - 1) * pageSize;
+      const pageRuns = allRuns.slice(startIdx, startIdx + pageSize);
+
+      pageRuns.forEach((run, index) => {
+        const runDiv = document.createElement('div');
+        runDiv.className = 'run-item';
+
+        const badgeOrder = ['passed', 'failed', 'skipped', 'flaky', 'timedout', 'unknown'];
+        const badgesHtml = badgeOrder
+          .map(status => {
+            const key = Object.keys(run.stats).find(k => k.toLowerCase() === status);
+            if (!key) return null;
+            return `<span class="status-badge ${status}" data-status="${status}">${status.toUpperCase()}: ${run.stats[key]}</span>`;
+          })
+          .filter(Boolean)
+          .join(' ');
+
+        const timeBadge = `<span class="status-badge time-badge">Time: ${run.totalTime || 'N/A'}</span>`;
+
+        runDiv.innerHTML = `<div><b>${run.timestamp}</b> ${badgesHtml} ${timeBadge}</div>
+                    <a href="${run.htmlReport}" target="_blank">View HTML Report</a>`;
+
+        // Add hover popup for badges
+        const popup = document.getElementById('testPopup');
+        runDiv.querySelectorAll('.status-badge').forEach(badgeEl => {
+          const status = badgeEl.dataset.status;
+          if(!status || !run.testsByStatus) return;
+          badgeEl.addEventListener('mouseenter', e => {
+            const statusLower = status.toLowerCase();
+            const testNames = run.testsByStatus[statusLower] || [];
+            popup.innerHTML = testNames.length
+              ? `<b>${status.toUpperCase()} Tests:</b><ul>${testNames.map(t => `<li>${t}</li>`).join('')}</ul>`
+              : `<b>No tests for ${status.toUpperCase()}</b>`;
+            popup.style.display = 'block';
+            popup.style.left = e.pageX + 10 + 'px';
+            popup.style.top = e.pageY + 10 + 'px';
+          });
+          badgeEl.addEventListener('mouseleave', () => popup.style.display = 'none');
+        });
+
+        runDiv.addEventListener('click', () => {
+          document.querySelectorAll('.run-item').forEach(el => el.classList.remove('selected'));
+          runDiv.classList.add('selected');
+          updateCharts(run);
+        });
+
+        runsDiv.appendChild(runDiv);
+
+        if (index === 0) {
+          runDiv.classList.add('selected');
+          updateCharts(run);
+        }
+      });
+
+      const totalPages = Math.ceil(allRuns.length / pageSize);
+      document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${totalPages}`;
+      document.getElementById('prevPage').disabled = currentPage === 1;
+      document.getElementById('nextPage').disabled = currentPage === totalPages;
+    }
+
+    function updateCharts(run) {
+      const labels = Object.keys(run.stats);
+      const data = Object.values(run.stats);
+      const colors = labels.map(status => {
+        switch(status.toLowerCase()) {
+          case 'passed': return '#4caf50';
+          case 'failed': return '#f44336';
+          case 'skipped': return '#9e9e9e';
+          case 'flaky': return '#ff9800';
+          case 'timedout': return '#9c27b0';
+          default: return '#607d8b';
+        }
+      });
+      const total = data.reduce((a,b)=>a+b,0);
+      const passed = run.stats.passed||0;
+      const failed = run.stats.failed||0;
+      document.getElementById('totals').textContent = `Total: ${total} | Passed: ${passed} | Failed: ${failed}`;
+
+      const popup = document.getElementById('testPopup');
+
+      const barCtx = document.getElementById('barChart').getContext('2d');
+      if(barChart) barChart.destroy();
+      barChart = new Chart(barCtx, {
+        type:'bar',
+        data:{labels,datasets:[{label:`Test Status - ${run.timestamp}`,data,backgroundColor:colors}]},
+        options:{
+          responsive:true,
+          plugins:{
+            legend:{display:false},
+            title:{display:true,text:`Total Tests: ${total}`},
+            tooltip:{
+              enabled: false,
+              external: (ctx) => {
+                const el = ctx.tooltip;
+                if(!el.opacity) { popup.style.display = 'none'; return; }
+                const idx = el.dataPoints[0].dataIndex;
+                const status = labels[idx];
+                const statusLower = status.toLowerCase();
+                const testNames = run.testsByStatus[statusLower] || [];
+                popup.innerHTML = testNames.length
+                  ? `<b>${status.toUpperCase()} Tests:</b><ul>${testNames.map(t => `<li>${t}</li>`).join('')}</ul>`
+                  : `<b>No tests for ${status.toUpperCase()}</b>`;
+                const canvasRect = ctx.chart.canvas.getBoundingClientRect();
+                popup.style.display = 'block';
+                popup.style.left = canvasRect.left + el.caretX + 10 + 'px';
+                popup.style.top = canvasRect.top + el.caretY + 10 + 'px';
+              }
+            }
+          },
+          scales:{y:{beginAtZero:true,title:{display:true,text:'Test Count'}}, x:{title:{display:true,text:'Status'}}}
+        }
+      });
+
+      const pieCtx = document.getElementById('pieChart').getContext('2d');
+      if(pieChart) pieChart.destroy();
+      pieChart = new Chart(pieCtx, {
+        type:'pie',
+        data:{labels,datasets:[{label:`Test Status - ${run.timestamp}`,data,backgroundColor:colors}]},
+        options:{
+          responsive:true,
+          plugins:{
+            legend:{position:'right'},
+            title:{display:true,text:`Total Tests: ${total}`},
+            tooltip:{
+              enabled:false,
+              external:(ctx)=>{
+                const el = ctx.tooltip;
+                if(!el.opacity) { popup.style.display = 'none'; return; }
+                const idx = el.dataPoints[0].dataIndex;
+                const status = labels[idx];
+                const statusLower = status.toLowerCase();
+                const testNames = run.testsByStatus[statusLower] || [];
+                popup.innerHTML = testNames.length
+                  ? `<b>${status.toUpperCase()} Tests:</b><ul>${testNames.map(t => `<li>${t}</li>`).join('')}</ul>`
+                  : `<b>No tests for ${status.toUpperCase()}</b>`;
+                const canvasRect = ctx.chart.canvas.getBoundingClientRect();
+                popup.style.display = 'block';
+                popup.style.left = canvasRect.left + el.caretX + 10 + 'px';
+                popup.style.top = canvasRect.top + el.caretY + 10 + 'px';
+              }
+            }
+          }
+        }
+      });
+    }
+
+    async function loadDates() {
+      const res = await fetch('/api/runs');
+      const runs = await res.json();
+      const uniqueDates = [...new Set(runs.map(r => r.date || r.timestamp.slice(0,10)))];
+      uniqueDates.sort((a,b)=> b.localeCompare(a));
+
+      const select = document.getElementById('dateSelect');
+      select.innerHTML = '<option value="">-- Select date --</option>';
+      uniqueDates.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d;
+        opt.text = d;
+        select.appendChild(opt);
+      });
+
+      select.addEventListener('change', () => {
+        const selected = select.value;
+        if (!selected) return;
+        loadRuns({ start: selected, end: selected });
+      });
+    }
+
+    function filterQuick(option) {
+      const today = new Date();
+      let startDate, endDate;
+
+      switch(option) {
+        case 'today': {
+          const d = toYMD(today);
+          startDate = d; endDate = d;
+          break;
+        }
+        case 'yesterday': {
+          const y = new Date(today);
+          y.setDate(y.getDate() - 1);
+          const d = toYMD(y);
+          startDate = d; endDate = d;
+          break;
+        }
+        case 'thisWeek': {
+          const start = startOfThisWeek(today);
+          startDate = toYMD(start);
+          endDate = toYMD(today);
+          break;
+        }
+        case 'lastWeek': {
+          const [lwStart, lwEnd] = lastWeekRange(today);
+          startDate = toYMD(lwStart);
+          endDate = toYMD(lwEnd);
+          break;
+        }
+        default:
+          startDate = null; endDate = null;
+      }
+
+      const params = (startDate && endDate) ? { start: startDate, end: endDate } : {};
+      loadRuns(params);
+    }
+
+    (async function init() {
+      await loadDates();
+      filterQuick('today');
+    })();
+
+    document.getElementById('prevPage').addEventListener('click', () => {
+      if (currentPage > 1) { currentPage--; displayRuns(); }
+    });
+    document.getElementById('nextPage').addEventListener('click', () => {
+      const totalPages = Math.ceil(allRuns.length / pageSize);
+      if (currentPage < totalPages) { currentPage++; displayRuns(); }
+    });
+    document.getElementById('pageSize').addEventListener('change', (e) => {
+      pageSize = parseInt(e.target.value, 10);
+      currentPage = 1;
+      displayRuns();
+    });
+
+    document.getElementById('archiveLink').addEventListener('click', async (e) => {
+      e.preventDefault();
+      const panel = document.getElementById('archivePanel');
+      const list = document.getElementById('archiveList');
+      if (panel.style.display === 'none' || panel.style.display === '') {
+        panel.style.display = 'block';
+        list.textContent = 'Loading…';
+        try {
+          const res = await fetch('/api/archive');
+          const archiveTree = await res.json();
+          if (!archiveTree || Object.keys(archiveTree).length === 0) {
+            list.innerHTML = '<div style="opacity:0.7;">No archive found yet.</div>';
+            return;
+          }
+
+          let html = "";
+          Object.entries(archiveTree)
+            .sort((a,b)=> b[0].localeCompare(a[0]))
+            .forEach(([year, months]) => {
+              html += `<details><summary><b>${year}</b></summary>`;
+              Object.entries(months)
+                .sort((a,b)=> b[0].localeCompare(a[0]))
+                .forEach(([month, days]) => {
+                  const visibleDays = days.slice(0, 10);
+                  const hiddenDays = days.slice(10);
+                  const dayLinks = visibleDays.map(day =>
+                    `<a href="#" onclick="loadRuns({start:'${day}', end:'${day}'}); return false;">${day.slice(8)}</a>`
+                  ).join(' ');
+
+                  let monthHtml = `<details><summary>${year}-${month}</summary><div style="margin-left:15px;">${dayLinks}`;
+                  if (hiddenDays.length > 0) {
+                    const moreId = `${year}-${month}-more`;
+                    monthHtml += `<span id="${moreId}" style="display:none;">` +
+                      hiddenDays.map(day =>
+                        `<a href="#" onclick="loadRuns({start:'${day}', end:'${day}'}); return false;">${day.slice(8)}</a>`
+                      ).join('') + `</span>`;
+                    monthHtml += `<br><a href="#" onclick="document.getElementById('${moreId}').style.display='inline'; this.style.display='none'; return false;">Load more…</a>`;
+                  }
+                  monthHtml += "</div></details>";
+                  html += monthHtml;
+                });
+              html += "</details>";
+            });
+          list.innerHTML = html;
+
+          const pickerHtml = `
+            <div style="margin-top:10px;">
+              <label>Custom Range: 
+                <input type="date" id="startDate"> 
+                <input type="date" id="endDate">
+                <button onclick="applyCustomRange()">Apply</button>
+              </label>
+            </div>
+          `;
+          list.innerHTML += pickerHtml;
+
+        } catch (err) {
+          list.innerHTML = '<div style="color:#f44336;">Failed to load archive.</div>';
+          console.error('Archive load error:', err);
+        }
+      } else { panel.style.display = 'none'; }
+    });
+
+    function applyCustomRange() {
+      const start = document.getElementById('startDate').value;
+      const end = document.getElementById('endDate').value; 
+      if (start && end) loadRuns({ start, end });
+    }
+  </script>
+</body>
+</html>

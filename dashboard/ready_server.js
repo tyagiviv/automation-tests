@@ -10,34 +10,19 @@ const PORT = 4000;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const reportsDir = path.join(__dirname, '../reports'); // adjust path if needed
+const reportsDir = path.join(__dirname, '../reports');
 const indexHtmlPath = path.join(__dirname, 'index.html');
 
-// ===== Serve static folders correctly =====
-app.use('/css', express.static(path.join(__dirname, 'css')));
-app.use('/js', express.static(path.join(__dirname, 'js')));
-app.use('/assets', express.static(path.join(__dirname, 'assets')));
+// Serve favicon and other static files
+app.use(express.static(__dirname));
 app.use('/reports', express.static(reportsDir));
 
-// ===== Serve main HTML =====
 app.get('/', (req, res) => res.sendFile(indexHtmlPath));
 
-// ==================== Helpers ====================
-function folderDate(folderName) { return folderName.slice(0, 10); }
-function inDateRange(dateStr, start, end) { return (!start || !end) ? true : (dateStr >= start && dateStr <= end); }
-function formatDuration(ms) {
-  let totalSeconds = Math.floor(ms / 1000);
-  const hours = Math.floor(totalSeconds / 3600);
-  totalSeconds %= 3600;
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
-  if (minutes > 0) return `${minutes}m ${seconds}s`;
-  return `${seconds}s`;
-}
-
+// ==================== countTests ====================
 function countTests(suite) {
   let stats = {};
+
   if (suite.specs) {
     suite.specs.forEach(spec => {
       if (spec.tests) {
@@ -46,8 +31,10 @@ function countTests(suite) {
             let firstFailed = false; 
             test.results.forEach((result, index) => {
               let status = result.status || 'unknown';
+
               if (index === 0 && status === 'failed') firstFailed = true;
               if (firstFailed && status === 'passed') status = 'flaky';
+
               stats[status] = (stats[status] || 0) + 1;
             });
           }
@@ -55,20 +42,24 @@ function countTests(suite) {
       }
     });
   }
+
   if (suite.suites) {
-    suite.suites.forEach(child => {
-      const childStats = countTests(child);
+    suite.suites.forEach(childSuite => {
+      const childStats = countTests(childSuite);
       for (const [status, count] of Object.entries(childStats)) {
         stats[status] = (stats[status] || 0) + count;
       }
     });
   }
+
   return stats;
 }
 
+// ==================== getTestsByStatus ====================
 function getTestsByStatus(suite, map = {}) {
   const allStatuses = ['passed','failed','skipped','flaky','timedout','unknown'];
   allStatuses.forEach(s => map[s] = map[s] || []);
+
   if (suite.specs) {
     suite.specs.forEach(spec => {
       if (spec.tests) {
@@ -77,8 +68,10 @@ function getTestsByStatus(suite, map = {}) {
             let firstFailed = false;
             test.results.forEach((result, idx) => {
               let status = (result.status || 'unknown').toLowerCase();
+
               if (idx === 0 && status === 'failed') firstFailed = true;
               if (firstFailed && status === 'passed') status = 'flaky';
+
               const testTitle = spec.title || 'Unnamed Test';
               if (!map[status].includes(testTitle)) map[status].push(testTitle);
             });
@@ -87,57 +80,114 @@ function getTestsByStatus(suite, map = {}) {
       }
     });
   }
+
   if (suite.suites) suite.suites.forEach(child => getTestsByStatus(child, map));
+
   return map;
 }
 
+// ==================== getTotalTime ====================
 function getTotalTime(suite) {
   let total = 0;
+
   if (suite.specs) {
     suite.specs.forEach(spec => {
       if (spec.tests) {
         spec.tests.forEach(test => {
-          if (test.results) test.results.forEach(r => total += r.duration || 0);
+          if (test.results) {
+            test.results.forEach(result => {
+              total += result.duration || 0;
+            });
+          }
         });
       }
     });
   }
-  if (suite.suites) suite.suites.forEach(child => { total += getTotalTime(child); });
+
+  if (suite.suites) {
+    suite.suites.forEach(childSuite => {
+      total += getTotalTime(childSuite);
+    });
+  }
+
   return total;
 }
 
-// ==================== API ====================
+// ======== Helpers =========
+function folderDate(folderName) {
+  return folderName.slice(0, 10); 
+}
+
+function inDateRange(dateStr, start, end) {
+  if (!start || !end) return true;
+  return dateStr >= start && dateStr <= end;
+}
+
+function formatDuration(ms) {
+  let totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  totalSeconds %= 3600;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
+}
+
+// ==================== /api/runs ====================
 app.get('/api/runs', (req, res) => {
   if (!fs.existsSync(reportsDir)) return res.json([]);
+
   const startDate = req.query.start || null;
   const endDate = req.query.end || null;
 
   const folders = fs.readdirSync(reportsDir)
     .filter(f => {
       const fullPath = path.join(reportsDir, f);
-      return fs.statSync(fullPath).isDirectory() && fs.existsSync(path.join(fullPath, 'results.json')) &&
-             inDateRange(folderDate(f), startDate, endDate);
-    }).sort((a,b) => b.localeCompare(a));
+      if (!fs.statSync(fullPath).isDirectory()) return false;
+      if (!fs.existsSync(path.join(fullPath, 'results.json'))) return false;
+      const d = folderDate(f);
+      return inDateRange(d, startDate, endDate);
+    })
+    .sort((a, b) => b.localeCompare(a));
 
   const runs = folders.map(folder => {
     const jsonPath = path.join(reportsDir, folder, 'results.json');
-    let stats = {}, testsByStatus = {}, totalTimeMs = 0;
+
+    let stats = {};
+    let testsByStatus = {};
+    let totalTimeMs = 0;
+
     try {
       const json = JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
-      if (json.stats && json.stats.duration != null) totalTimeMs = json.stats.duration;
-      else if (json.startTime && json.endTime) totalTimeMs = new Date(json.endTime) - new Date(json.startTime);
-      else if (json.suites) json.suites.forEach(suite => { totalTimeMs += getTotalTime(suite); });
+
+      if (json.stats && json.stats.duration != null) {
+        totalTimeMs = json.stats.duration;
+      } else if (json.startTime && json.endTime) {
+        totalTimeMs = new Date(json.endTime) - new Date(json.startTime);
+      } else if (json.suites) {
+        json.suites.forEach(suite => {
+          totalTimeMs += getTotalTime(suite);
+        });
+      }
+
       if (json.suites) {
         json.suites.forEach(suite => {
           const s = countTests(suite);
-          for (const [status, count] of Object.entries(s)) stats[status] = (stats[status] || 0) + count;
+          for (const [status, count] of Object.entries(s)) {
+            stats[status] = (stats[status] || 0) + count;
+          }
+
           testsByStatus = getTestsByStatus(suite, testsByStatus);
         });
       }
+
     } catch (err) {
       console.error(`Failed to parse JSON for ${folder}`, err);
       return null;
     }
+
     return {
       timestamp: folder,
       date: folderDate(folder),
@@ -146,29 +196,41 @@ app.get('/api/runs', (req, res) => {
       testsByStatus,
       totalTime: formatDuration(totalTimeMs)
     };
-  }).filter(r => r !== null);
+  }).filter(run => run !== null);
 
   res.json(runs);
 });
 
+// ==================== /api/archive ====================
 app.get('/api/archive', (req, res) => {
   if (!fs.existsSync(reportsDir)) return res.json({});
+
   const folders = fs.readdirSync(reportsDir)
-    .filter(f => fs.statSync(path.join(reportsDir,f)).isDirectory() &&
-                  fs.existsSync(path.join(reportsDir, f, 'results.json')));
+    .filter(f => {
+      const fullPath = path.join(reportsDir, f);
+      return fs.statSync(fullPath).isDirectory() && fs.existsSync(path.join(fullPath, 'results.json'));
+    });
+
   const tree = {};
-  folders.forEach(f => {
+  for (const f of folders) {
     const date = folderDate(f);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
-    const year = date.slice(0,4), month = date.slice(5,7);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+    const year = date.slice(0, 4);
+    const month = date.slice(5, 7);
     tree[year] = tree[year] || {};
     tree[year][month] = tree[year][month] || new Set();
     tree[year][month].add(date);
-  });
-  Object.keys(tree).forEach(y => Object.keys(tree[y]).forEach(m => {
-    tree[y][m] = Array.from(tree[y][m]).sort().reverse();
-  }));
+  }
+
+  for (const y of Object.keys(tree)) {
+    for (const m of Object.keys(tree[y])) {
+      tree[y][m] = Array.from(tree[y][m]).sort().reverse();
+    }
+  }
+
   res.json(tree);
 });
 
-app.listen(PORT, () => console.log(`Dashboard running at http://localhost:${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Dashboard running at http://localhost:${PORT}`);
+});
