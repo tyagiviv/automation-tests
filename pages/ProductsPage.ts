@@ -6,6 +6,10 @@ export class ProductsPage extends BasePage {
   readonly productList: Locator;
   readonly searchField: Locator;
   readonly searchButton: Locator;
+  readonly firstProductAddToCartBtn: Locator;
+  readonly secondProductAddToCartBtn: Locator;
+
+
 
   constructor(page: Page) {
     super(page);
@@ -14,6 +18,11 @@ export class ProductsPage extends BasePage {
     this.productList = page.locator('.product-image-wrapper'); // adjust selector to match your product items
     this.searchField = page.locator('#search_product');
     this.searchButton = page.locator('#submit_search');
+    this.firstProductAddToCartBtn = page.locator('button.btn.btn-default.cart').first();
+    this.secondProductAddToCartBtn = page.locator('button.btn.btn-default.cart').nth(1);
+
+
+
   }
 
   async gotoProducts() {
@@ -98,5 +107,22 @@ export class ProductsPage extends BasePage {
   async getAllProductNames(): Promise<string[]> {
     return await this.page.locator('.productinfo p').allInnerTexts();
   }
+
+  async selectFirstProduct() {
+    // First product
+    await this.firstProductAddToCartBtn.hover();
+    await this.firstProductAddToCartBtn.click();
+    await this.dismissPopups(); // handle "Continue Shopping"
+
+  }
+  async selectSecondProduct(){
+    // Second product
+    await this.secondProductAddToCartBtn.hover();
+    await this.secondProductAddToCartBtn.click();
+    await this.dismissPopups(); // handle "Continue Shopping"
+  }
+
+
+
 
 }

@@ -15,6 +15,7 @@ export class BasePage {
       /agree/i,
       /enable accessibility/i,
       /continue/i,
+      /continue shopping/i,
     ];
 
     for (const text of popupButtons) {
