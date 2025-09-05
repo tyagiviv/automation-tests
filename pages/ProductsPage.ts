@@ -107,20 +107,44 @@ export class ProductsPage extends BasePage {
   async getAllProductNames(): Promise<string[]> {
     return await this.page.locator('.productinfo p').allInnerTexts();
   }
+/*
+  // Smart Add to Cart
+  async addProduct(index?: number) {
+    if (typeof index === 'number') {
+      // Listing page flow
+      const product = this.productList.nth(index);
+      const name = await product.locator('.productinfo p').textContent();
+      const priceText = await product.locator('.productinfo h2').textContent();
+      const price = Number(priceText?.replace('$', '').trim());
 
-  async selectFirstProduct() {
+      console.log(`🛒 Adding Product (list page): ${name?.trim()} | Price: $${price} | Qty: 1`);
+
+      const addButton = product.locator('button.btn.btn-default.cart');
+      await addButton.hover();
+      await addButton.click();
+      await this.dismissPopups();
+    } else {
+      // Details page flow
+      const name = await this.page.locator('.product-information h2').textContent();
+      const priceText = await this.page.locator('.product-information span > span').textContent();
+      const price = Number(priceText?.replace('$', '').trim());
+
+      console.log(`🛒 Adding Product (details page): ${name?.trim()} | Price: $${price} | Qty: 1`);
+
+      const addButton = this.page.locator('button.cart');
+      await addButton.click();
+      await this.dismissPopups();
+    }
+  }
+ */
+  async selectProduct() {
     // First product
     await this.firstProductAddToCartBtn.hover();
     await this.firstProductAddToCartBtn.click();
     await this.dismissPopups(); // handle "Continue Shopping"
 
   }
-  async selectSecondProduct(){
-    // Second product
-    await this.secondProductAddToCartBtn.hover();
-    await this.secondProductAddToCartBtn.click();
-    await this.dismissPopups(); // handle "Continue Shopping"
-  }
+
 
 
 

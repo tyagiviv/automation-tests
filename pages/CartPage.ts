@@ -22,6 +22,8 @@ export class CartPage extends BasePage {   // ✅ named export
   async cartScrollToFooter() {
     await this.page.locator('footer').scrollIntoViewIfNeeded();
   }
+  
+  
   // --- NEW FUNCTIONS ---
   
   async getCartProductNames(): Promise<string[]> {
@@ -41,6 +43,19 @@ export class CartPage extends BasePage {   // ✅ named export
   async getProductTotalByIndex(index: number): Promise<number> {
     const text = await this.cartRows.nth(index).locator('.cart_total p').textContent();
     return Number(text?.replace('$', '').trim());
+  }
+  // ⭐ NEW: Log cart contents
+  async logCartContents() {
+    const names = await this.getCartProductNames();
+    console.log(`🛒 Cart contains ${names.length} products:`);
+
+    for (let i = 0; i < names.length; i++) {
+      const price = await this.getProductPriceByIndex(i);
+      const qty = await this.getProductQuantityByIndex(i);
+      const total = await this.getProductTotalByIndex(i);
+
+      console.log(`   ${i + 1}. ${names[i]} | Price: $${price} | Qty: ${qty} | Total: $${total}`);
+    }
   }
 }
 
