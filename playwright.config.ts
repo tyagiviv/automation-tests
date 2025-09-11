@@ -75,5 +75,38 @@ export default defineConfig({
         baseURL: 'https://www.automationexercise.com',
       },
     },
+
+    // ✅ NEW API PROJECTS START HERE
+    {
+      name: 'api-dev',
+      testDir: './api/tests',
+      use: {
+        baseURL: 'https://dev.automationexercise.com/api',
+        extraHTTPHeaders: {
+          'Content-Type': 'application/json',
+        },
+      },
+    },
+    {
+      name: 'api-staging',
+      testDir: './api/tests',
+      use: {
+        baseURL: 'https://staging.automationexercise.com/api',
+        extraHTTPHeaders: {
+          'Content-Type': 'application/json',
+        },
+      },
+    },
+    {
+      name: 'api-prod',
+      testDir: './api/tests',
+      use: {
+        baseURL: 'https://www.automationexercise.com/api',
+        extraHTTPHeaders: {
+          'Content-Type': 'application/json',
+        },
+      },
+    },
+    // ✅ NEW API PROJECTS END HERE
   ],
 });

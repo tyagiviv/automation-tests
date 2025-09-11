@@ -123,5 +123,15 @@ npx playwright test --project=prod
 npx playwright test --project=dev
 npx playwright test --project=staging
 
+# to run on api env level:
+npx playwright test --project=api-prod
+npx playwright test --project=api-dev
+npx playwright test --project=api-staging
+
+# to run both api and ui test suite with one go:
+npx playwright test --project=prod --project=api-prod
+npm run test:prod-all   # defined npm script in package.json than can use this command
+
+
 # To run specific test on debug and headed view with enviornment defined...
 npx playwright test tests/product/7_productSearch.spec.ts --project=prod --headed --debug

@@ -5,7 +5,10 @@
   "main": "index.js",
   "scripts": {
     "test": "RUN_TIMESTAMP=$(node -e \"console.log(new Date().toISOString().replace(/[:.]/g,'-'))\") npx playwright test",
-    "report": "npx playwright show-report"
+    "report": "npx playwright show-report",
+    "test:prod-all": "npx playwright test --project=prod --project=api-prod"
+
+
   },
   "keywords": [],
   "author": "",
@@ -21,4 +24,6 @@
   "dependencies": {
     "express": "^5.1.0"
   }
+  
+
 }
