@@ -3,7 +3,7 @@ name: test-and-deploy
 on:
   schedule:
     - cron: "0 * * * *"   # every hour UTC
-  workflow_dispatch:
+  workflow_dispatch:      # allow manual run
 
 permissions:
   contents: write
@@ -11,6 +11,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -60,10 +61,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout gh-pages branch
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          ref: gh-pages
+          fetch-depth: 0
 
       - name: Download reports
         uses: actions/download-artifact@v4
@@ -73,16 +75,13 @@ jobs:
 
       - name: Prepare reports folder and cleanup
         run: |
-          mkdir -p public/reports
-
-          # Use format with 'T' and 'Z' if you like
+          mkdir -p reports
           timestamp=$(date -u +"%Y-%m-%dT%H-%M-%S-%3NZ")
-          mv reports/latest public/reports/$timestamp
+          mv reports/latest reports/$timestamp
 
-          cd public/reports || exit
+          cd reports || exit
 
-          # List all directories that start with '20' (timestamp style)
-          # sorted by modification time, newest first
+          # Sort folders by modification time (newest first)
           all_dirs=$(ls -1dt 20* | head -n 1000)
 
           keep_dirs=$(echo "$all_dirs" | head -n 10)
@@ -94,14 +93,13 @@ jobs:
           if [ -n "$keep_dirs" ]; then
             echo "### Kept report folders:"
             for dir in $keep_dirs; do
-              echo "- $dir"
+              echo "- [${dir}](https://tyagiviv.github.io/automation-tests/reports/${dir}/index.html)"
             done
           fi
 
           if [ -n "$remove_dirs" ]; then
             echo "### Removing old report folders:"
             echo "$remove_dirs"
-            # remove each
             for d in $remove_dirs; do
               rm -rf "$d"
             done
@@ -113,5 +111,5 @@ jobs:
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./public
+          publish_dir: .
           keep_files: true
