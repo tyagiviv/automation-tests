@@ -1,48 +1,61 @@
-name: Playwright Prod Hourly Run
+name: test-and-deploy
 
 on:
   schedule:
-    # Run every hour at minute 0
-    - cron: '0 * * * *'
-  workflow_dispatch: # allows manual trigger
+    - cron: "0 * * * *"   # every hour UTC
+  workflow_dispatch:      # allow manual run
 
 jobs:
-  test-and-deploy:
+  test:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 20
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
-      - name: Run prod + API-prod Playwright tests
+      - name: Run Playwright tests (prod only)
         run: npm run test:prod-all
 
-      - name: Prepare reports for GitHub Pages
-        run: |
-          mkdir -p reports-gh-pages
-          cp -r reports/* reports-gh-pages/
-          cd reports-gh-pages
-          # Keep only last 10 report folders (sorted by name)
-          folders_to_delete=$(ls -1 | sort | head -n -10)
-          if [ -n "$folders_to_delete" ]; then
-            echo "Deleting old reports:"
-            echo "$folders_to_delete"
-            echo "$folders_to_delete" | xargs rm -rf
-          fi
-          cd ..
+      - name: Upload reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: html-report
+          path: reports/**/html-report
 
-      - name: Deploy reports to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v6
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Download reports
+        uses: actions/download-artifact@v4
+        with:
+          name: html-report
+          path: reports/latest
+
+      - name: Prepare reports folder
+        run: |
+          mkdir -p public/reports
+          timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
+          mv reports/latest public/reports/$timestamp
+
+          # Keep only last 10 reports
+          cd public/reports
+          ls -t | tail -n +11 | xargs -I {} rm -rf {}
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4.0.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./reports-gh-pages
-          publish_branch: gh-pages
-          keep_files: true
+          publish_dir: ./public
