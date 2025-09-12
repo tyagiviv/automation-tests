@@ -7,7 +7,7 @@ on:
 
 permissions:
   contents: write
-  
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -78,9 +78,16 @@ jobs:
           timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
           mv reports/latest public/reports/$timestamp
 
-          # Keep only last 10 reports
+          # Keep only last 10 reports and log removed ones
           cd public/reports
-          ls -t | tail -n +11 | xargs -I {} rm -rf {}
+          old_dirs=$(ls -1dt */ | tail -n +11)
+          if [ -n "$old_dirs" ]; then
+            echo "Removing old report folders:"
+            echo "$old_dirs"
+            echo "$old_dirs" | xargs -r rm -rf
+          else
+            echo "No old report folders to remove."
+          fi
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
