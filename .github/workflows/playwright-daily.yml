@@ -1,4 +1,4 @@
-name: test-and-deploy
+name: test-and-deploy-daily
 
 on:
   schedule:
