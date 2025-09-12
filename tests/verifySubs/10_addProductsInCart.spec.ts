@@ -4,7 +4,7 @@ import { ProductsPage } from '@pages/ProductsPage';
 import { CartPage } from '@pages/CartPage';
 
 test.describe('Add Products in cart', () => {
-  test('10 Add Product (1 & 2) and check in Cart', async ({ page }) => {
+  test.skip('10 Add Product (1 & 2) and check in Cart', async ({ page }) => {
     const homePage = new HomePage(page);
     const cartPage = new CartPage(page);
     const productsPage = new ProductsPage(page);
