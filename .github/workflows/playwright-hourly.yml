@@ -78,11 +78,15 @@ jobs:
           timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
           mv reports/latest public/reports/$timestamp
 
-          cd public/reports
+          cd public/reports || exit
 
-          all_dirs=$(ls -1d 20*_* | sort -r)
-          keep_dirs=$(echo "$all_dirs" | head -n 10)
-          remove_dirs=$(echo "$all_dirs" | tail -n +11)
+          # List all directories starting with '20' sorted descending
+          all_dirs=$(find . -maxdepth 1 -type d -name "20*" | sort -r)
+          all_dirs_clean=$(echo "$all_dirs" | sed 's|^\./||')
+
+          # Keep latest 10, remove the rest
+          keep_dirs=$(echo "$all_dirs_clean" | head -n 10)
+          remove_dirs=$(echo "$all_dirs_clean" | tail -n +11)
 
           # Log kept folders with clickable links
           if [ -n "$keep_dirs" ]; then
