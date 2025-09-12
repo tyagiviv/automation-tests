@@ -87,21 +87,24 @@ jobs:
           keep_dirs=$(echo "$all_dirs" | head -n 10)
           remove_dirs=$(echo "$all_dirs" | tail -n +11)
 
+          keep_count=$(echo "$keep_dirs" | wc -l | tr -d ' ')
+          remove_count=$(echo "$remove_dirs" | wc -l | tr -d ' ')
+
           echo "### All report folders:"
           echo "$all_dirs"
 
           if [ -n "$keep_dirs" ]; then
-            echo "### Kept report folders:"
+            echo "### Kept $keep_count report folders (clickable):"
             for dir in $keep_dirs; do
               echo "- [${dir}](https://tyagiviv.github.io/automation-tests/reports/${dir}/index.html)"
             done
           fi
 
           if [ -n "$remove_dirs" ]; then
-            echo "### Removing old report folders:"
-            echo "$remove_dirs"
-            for d in $remove_dirs; do
-              rm -rf "$d"
+            echo "### Removing $remove_count old report folders (clickable):"
+            for dir in $remove_dirs; do
+              echo "- [${dir}](https://tyagiviv.github.io/automation-tests/reports/${dir}/index.html)"
+              rm -rf "$dir"
             done
           else
             echo "No old report folders to remove."
@@ -112,4 +115,3 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: .
-          keep_files: true
