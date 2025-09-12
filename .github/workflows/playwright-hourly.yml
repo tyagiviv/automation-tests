@@ -16,7 +16,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1   # faster, no full history
+          fetch-depth: 1
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -50,7 +50,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload reports
-        if: always()   # upload reports even if tests fail
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: html-report
@@ -72,19 +72,31 @@ jobs:
           name: html-report
           path: reports/latest
 
-      - name: Prepare reports folder
+      - name: Prepare reports folder and cleanup
         run: |
           mkdir -p public/reports
           timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
           mv reports/latest public/reports/$timestamp
 
-          # Keep only last 10 timestamped report folders and log removed ones
           cd public/reports
-          old_dirs=$(ls -1d 20*_* | sort -r | tail -n +11)
-          if [ -n "$old_dirs" ]; then
-            echo "Removing old report folders:"
-            echo "$old_dirs"
-            echo "$old_dirs" | xargs -r rm -rf
+
+          all_dirs=$(ls -1d 20*_* | sort -r)
+          keep_dirs=$(echo "$all_dirs" | head -n 10)
+          remove_dirs=$(echo "$all_dirs" | tail -n +11)
+
+          # Log kept folders with clickable links
+          if [ -n "$keep_dirs" ]; then
+            echo "### Kept report folders (clickable links):"
+            for dir in $keep_dirs; do
+              echo "- [${dir}](https://tyagiviv.github.io/automation-tests/reports/${dir}/index.html)"
+            done
+          fi
+
+          # Remove old folders and log
+          if [ -n "$remove_dirs" ]; then
+            echo "### Removing old report folders:"
+            echo "$remove_dirs"
+            echo "$remove_dirs" | xargs -r rm -rf
           else
             echo "No old report folders to remove."
           fi
@@ -94,5 +106,4 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./public
-          keep_files: false   # remove old folders from gh-pages
-          force: true         # force update
+          keep_files: true
