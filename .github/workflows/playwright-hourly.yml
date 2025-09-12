@@ -2,7 +2,8 @@ name: test-and-deploy
 
 on:
   schedule:
-    - cron: "0 * * * *"   # every hour UTC
+    - cron: "0 2 * * *"   # every day at 2:00 AM UTC
+    # - cron: "0 * * * *" # every hour
   workflow_dispatch:      # allow manual run
 
 permissions:
