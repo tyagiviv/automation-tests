@@ -75,18 +75,19 @@ jobs:
       - name: Prepare reports folder and cleanup
         run: |
           mkdir -p public/reports
-          timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
+
+          # Use ISO-like timestamp with milliseconds and Z suffix
+          timestamp=$(date -u +"%Y-%m-%dT%H-%M-%S-%3NZ")
           mv reports/latest public/reports/$timestamp
 
           cd public/reports || exit
 
-          # List all directories starting with '20' sorted descending
-          all_dirs=$(find . -maxdepth 1 -type d -name "20*" | sort -r)
-          all_dirs_clean=$(echo "$all_dirs" | sed 's|^\./||')
-
+          # List directories by modification time (newest first)
+          all_dirs=$(ls -1dt 20* | head -n 1000)
+          
           # Keep latest 10, remove the rest
-          keep_dirs=$(echo "$all_dirs_clean" | head -n 10)
-          remove_dirs=$(echo "$all_dirs_clean" | tail -n +11)
+          keep_dirs=$(echo "$all_dirs" | head -n 10)
+          remove_dirs=$(echo "$all_dirs" | tail -n +11)
 
           # Log kept folders with clickable links
           if [ -n "$keep_dirs" ]; then
@@ -100,7 +101,7 @@ jobs:
           if [ -n "$remove_dirs" ]; then
             echo "### Removing old report folders:"
             echo "$remove_dirs"
-            echo "$remove_dirs" | xargs -r rm -rf
+            rm -rf $remove_dirs
           else
             echo "No old report folders to remove."
           fi
