@@ -12,14 +12,32 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1   # faster, no full history
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
+      - name: Cache node_modules
+        uses: actions/cache@v3
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            node-modules-${{ runner.os }}-
+
       - name: Install dependencies
         run: npm install
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browsers-${{ runner.os }}
+          restore-keys: |
+            playwright-browsers-${{ runner.os }}-
 
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps
@@ -28,9 +46,8 @@ jobs:
         run: npm run test:prod-all
         continue-on-error: true
 
-
       - name: Upload reports
-        if: always()   # ✅ upload reports even if tests fail
+        if: always()   # upload reports even if tests fail
         uses: actions/upload-artifact@v4
         with:
           name: html-report
@@ -43,6 +60,8 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
       - name: Download reports
         uses: actions/download-artifact@v4
@@ -61,7 +80,8 @@ jobs:
           ls -t | tail -n +11 | xargs -I {} rm -rf {}
 
       - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4.0.0
+        uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./public
+          keep_files: true   # only update changed files
